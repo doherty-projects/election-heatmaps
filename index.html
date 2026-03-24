@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Election Heatmap Viewer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0f11;
+    --surface: #16181c;
+    --surface2: #1e2128;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0ede8;
+    --muted: #8a8780;
+    --accent: #c9a96e;
+    --accent2: #e8c98a;
+    --active-bg: #c9a96e;
+    --active-text: #0e0f11;
+    --pill-bg: #1e2128;
+    --pill-border: rgba(255,255,255,0.1);
+    --pill-active-bg: #c9a96e;
+    --pill-active-border: #c9a96e;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 2.5rem 3rem 2rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 2rem;
+  }
+
+  .header-left h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.75rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--text);
+  }
+
+  .header-left p {
+    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .header-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--accent);
+    border: 1px solid rgba(201,169,110,0.3);
+    padding: 0.3rem 0.8rem;
+    border-radius: 2px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  main {
+    display: flex;
+    flex: 1;
+  }
+
+  .sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .filter-group label {
+    display: block;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .pill-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .pill {
+    font-size: 0.8rem;
+    font-weight: 400;
+    padding: 0.45rem 1rem;
+    border-radius: 2px;
+    border: 1px solid var(--pill-border);
+    background: var(--pill-bg);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    letter-spacing: 0.01em;
+  }
+
+  .pill:hover {
+    border-color: var(--border2);
+    color: var(--text);
+  }
+
+  .pill.active {
+    background: var(--pill-active-bg);
+    border-color: var(--pill-active-border);
+    color: var(--active-text);
+    font-weight: 500;
+  }
+
+  .year-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.4rem;
+  }
+
+  .year-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 0.5rem 0;
+    border-radius: 2px;
+    border: 1px solid var(--pill-border);
+    background: var(--pill-bg);
+    color: var(--muted);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+
+  .year-btn:hover {
+    border-color: var(--border2);
+    color: var(--text);
+  }
+
+  .year-btn.active {
+    background: var(--pill-active-bg);
+    border-color: var(--pill-active-border);
+    color: var(--active-text);
+    font-weight: 500;
+  }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .current-selection {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    line-height: 1.8;
+  }
+
+  .current-selection span {
+    color: var(--accent2);
+  }
+
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem;
+  }
+
+  .heatmap-wrapper {
+    width: 100%;
+    max-width: 900px;
+    position: relative;
+  }
+
+  .heatmap-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .heatmap-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.15rem;
+    font-weight: 400;
+    color: var(--text);
+  }
+
+  .heatmap-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .image-frame {
+    width: 100%;
+    aspect-ratio: 14 / 11;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .image-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: none;
+  }
+
+  .image-frame img.loaded {
+    display: block;
+  }
+
+  .placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    text-align: center;
+  }
+
+  .placeholder-icon {
+    width: 56px;
+    height: 56px;
+    border: 1px solid var(--border2);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.4;
+  }
+
+  .placeholder-icon svg {
+    width: 24px;
+    height: 24px;
+    stroke: var(--muted);
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .placeholder p {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.04em;
+  }
+
+  .error-state p {
+    color: #e05a5a;
+  }
+
+  .loading-state p {
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  .image-frame.has-image .placeholder { display: none; }
+
+  .download-row {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .filename-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  .btn-download {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.5rem 1.25rem;
+    background: transparent;
+    border: 1px solid rgba(201,169,110,0.4);
+    color: var(--accent);
+    border-radius: 2px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s;
+    display: inline-block;
+  }
+
+  .btn-download:hover {
+    background: rgba(201,169,110,0.08);
+    border-color: var(--accent);
+  }
+
+  .btn-download.hidden { display: none; }
+
+  @media (max-width: 720px) {
+    main { flex-direction: column; }
+    .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); padding: 1.25rem; }
+    header { padding: 1.5rem; }
+    .content { padding: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Election Heatmap Viewer</h1>
+    <p>Share of Voice &mdash; Outcome Correlation Analysis</p>
+  </div>
+  <div class="header-badge">Historical Data</div>
+</header>
+
+<main>
+  <aside class="sidebar">
+
+    <div class="filter-group">
+      <label>Office</label>
+      <div class="pill-grid" id="office-pills">
+        <div class="pill active" data-filter="office" data-value="president">President</div>
+        <div class="pill" data-filter="office" data-value="senate">Senate</div>
+        <div class="pill" data-filter="office" data-value="governor">Governor</div>
+        <div class="pill" data-filter="office" data-value="house">House</div>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>Election Year</label>
+      <div class="year-grid" id="year-btns">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>Race Type</label>
+      <div class="pill-grid" id="race-pills">
+        <div class="pill active" data-filter="race" data-value="all">All races</div>
+        <div class="pill" data-filter="race" data-value="open">Open seat</div>
+        <div class="pill" data-filter="race" data-value="incumbent">Incumbent running</div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="current-selection" id="selection-summary">
+        Loading selection&hellip;
+      </div>
+    </div>
+
+  </aside>
+
+  <section class="content">
+    <div class="heatmap-wrapper">
+      <div class="heatmap-header">
+        <div class="heatmap-title" id="chart-title">Select filters to load heatmap</div>
+        <div class="heatmap-meta" id="chart-meta">&mdash;</div>
+      </div>
+
+      <div class="image-frame" id="image-frame">
+        <img id="heatmap-img" alt="Election heatmap" />
+        <div class="placeholder" id="placeholder">
+          <div class="placeholder-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M9 21V9"/></svg>
+          </div>
+          <p id="placeholder-text">Select filters to load a heatmap</p>
+        </div>
+      </div>
+
+      <div class="download-row">
+        <span class="filename-label" id="filename-label"></span>
+        <a class="btn-download hidden" id="download-btn" download>Download PNG</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  // ─────────────────────────────────────────────────────────────
+  // CONFIGURATION — edit this section to match your actual files
+  // ─────────────────────────────────────────────────────────────
+
+  const YEARS = [2024, 2022];
+
+  // Folder where all PNG heatmaps live (relative to index.html)
+  const IMG_DIR = 'heatmaps/';
+
+  // Filename convention: {year}_{office}_{racetype}.png
+  // Example: 2024_senate_open.png  |  2022_house_incwon.png
+  // Change buildFilename() below if you use a different naming scheme.
+  function buildFilename(office, year, race) {
+    return `${office}_${year}_${race}.png`;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // STATE
+  // ─────────────────────────────────────────────────────────────
+
+  const state = { year: YEARS[0], office: 'president', race: 'open' };
+
+  // ─────────────────────────────────────────────────────────────
+  // BUILD YEAR BUTTONS
+  // ─────────────────────────────────────────────────────────────
+
+  const yearGrid = document.getElementById('year-btns');
+  YEARS.forEach(y => {
+    const btn = document.createElement('div');
+    btn.className = 'year-btn' + (y === state.year ? ' active' : '');
+    btn.textContent = y;
+    btn.dataset.year = y;
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.year = y;
+      loadImage();
+    });
+    yearGrid.appendChild(btn);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // PILL CLICKS
+  // ─────────────────────────────────────────────────────────────
+
+  document.querySelectorAll('.pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const filter = pill.dataset.filter;
+      const group = filter === 'office' ? '#office-pills' : '#race-pills';
+      document.querySelectorAll(`${group} .pill`).forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      state[filter] = pill.dataset.value;
+      loadImage();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // IMAGE LOADING
+  // ─────────────────────────────────────────────────────────────
+
+  const imgEl       = document.getElementById('heatmap-img');
+  const frame       = document.getElementById('image-frame');
+  const placeholder = document.getElementById('placeholder');
+  const placeholderText = document.getElementById('placeholder-text');
+  const chartTitle  = document.getElementById('chart-title');
+  const chartMeta   = document.getElementById('chart-meta');
+  const downloadBtn = document.getElementById('download-btn');
+  const filenameLabel = document.getElementById('filename-label');
+  const selectionSummary = document.getElementById('selection-summary');
+
+  function officeName(v) {
+    return { president: 'Presidential', senate: 'U.S. Senate', governor: 'Gubernatorial', house: 'U.S. House' }[v] || v;
+  }
+
+  function raceName(v) {
+    return { all: 'All race types', open: 'Open seat only', incumbent: 'Incumbent running' }[v] || v;
+  }
+
+  function updateSummary() {
+    selectionSummary.innerHTML =
+      `Office &nbsp;<span>${officeName(state.office)}</span><br>` +
+      `Year &nbsp;&nbsp;&nbsp;<span>${state.year}</span><br>` +
+      `Type &nbsp;&nbsp;&nbsp;<span>${raceName(state.race)}</span>`;
+  }
+
+  function loadImage() {
+    updateSummary();
+
+    const filename = buildFilename(state.office, state.year, state.race);
+    const src = IMG_DIR + filename;
+    const title = `${officeName(state.office)} Races · ${state.year}`;
+    const meta = raceName(state.race).toUpperCase();
+
+    chartTitle.textContent = title;
+    chartMeta.textContent = meta;
+    filenameLabel.textContent = filename;
+
+    // Reset
+    imgEl.classList.remove('loaded');
+    frame.classList.remove('has-image');
+    placeholder.className = 'placeholder loading-state';
+    placeholderText.textContent = 'Loading heatmap…';
+    downloadBtn.classList.add('hidden');
+    downloadBtn.href = '';
+
+    const testImg = new Image();
+    testImg.onload = () => {
+      imgEl.src = src;
+      imgEl.classList.add('loaded');
+      frame.classList.add('has-image');
+      downloadBtn.href = src;
+      downloadBtn.download = filename;
+      downloadBtn.classList.remove('hidden');
+    };
+    testImg.onerror = () => {
+      imgEl.classList.remove('loaded');
+      frame.classList.remove('has-image');
+      placeholder.className = 'placeholder error-state';
+      placeholderText.textContent = `No heatmap found: ${filename}`;
+      downloadBtn.classList.add('hidden');
+    };
+    testImg.src = src;
+  }
+
+  // Initial load
+  updateSummary();
+  loadImage();
+</script>
+</body>
+</html>
